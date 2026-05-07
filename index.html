@@ -739,7 +739,7 @@ function buildWkHeader(){
   sel.forEach(w=>{
     r1+=`<th colspan="8" style="background:#1A3D6E;color:#fff;text-align:center;white-space:nowrap;border-bottom:2px solid #F5C400">${w.label}</th>`;
   });
-  r1+='<th rowspan="2" style="background:#0D2040;color:#fff;min-width:80px;border-bottom:2px solid #F5C400">Grand Total</th>';
+  r1+='<th rowspan="2" style="background:#0D2040;color:#fff;min-width:80px;border-bottom:2px solid #F5C400" title="Sum of the weeks currently visible">Period Total</th>';
   r1+='<th rowspan="2" style="background:#A88000;color:#fff;min-width:70px;border-bottom:2px solid #F5C400">Miss YTD</th></tr>';
   let r2='<tr>';
   sel.forEach(()=>{
@@ -817,7 +817,7 @@ function exportWk(){
   const h1=['Employer','Employee ID','Name'];
   const h2=['','',''];
   sel.forEach(w=>{WK_DAYS.forEach(d=>{h1.push(w.label);h2.push(d);});h1.push(w.label);h2.push('Total');});
-  h1.push('','');h2.push('Grand Total','Miss YTD');
+  h1.push('','');h2.push('Period Total','Miss YTD');
   aoa.push(h1,h2);
   rows.forEach(r=>{
     const ps=r.employer==='Primeserve';
