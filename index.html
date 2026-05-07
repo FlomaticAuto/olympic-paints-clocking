@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;700;800;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script>var t=localStorage.getItem('oly-theme');if(t)document.documentElement.className=t;</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
@@ -239,6 +240,21 @@ td.emp-op{color:var(--color-brand-primary);font-weight:700}
 .miss-count-badge{display:inline-block;background:var(--color-danger-bd);color:#fff;border-radius:var(--r-pill);padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px}
 .miss-count-badge.zero{background:var(--color-success-bd)}
 
+/* ── WEEK FILTER (Weekly Hours tab) ───────────────────────────── */
+.wk-filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--color-surface-base);border:1px solid var(--color-border-subtle);border-radius:var(--r-md);padding:10px 12px;margin-bottom:12px}
+.wk-filter-label{font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--color-text-secondary);margin-right:4px}
+.wk-preset{font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--color-border-default);background:var(--color-surface-sunken);color:var(--color-text-primary);padding:5px 10px;border-radius:var(--r-sm);cursor:pointer}
+.wk-preset:hover{background:var(--color-brand-primary);color:var(--color-text-on-brand);border-color:var(--color-brand-primary)}
+.wk-divider{width:1px;height:20px;background:var(--color-border-default);margin:0 4px}
+#wk-week-chips{display:flex;flex-wrap:wrap;gap:5px;flex:1;min-width:200px}
+.wk-chip{font-family:var(--font-body);font-size:11px;font-weight:600;border:1px solid var(--color-border-default);background:var(--color-surface-sunken);color:var(--color-text-secondary);padding:4px 9px;border-radius:var(--r-pill);cursor:pointer;white-space:nowrap;transition:all .12s}
+.wk-chip:hover{border-color:var(--color-brand-primary);color:var(--color-text-primary)}
+.wk-chip.active{background:var(--color-brand-primary);color:var(--color-text-on-brand);border-color:var(--color-brand-primary);font-weight:700}
+.btn-export{font-family:var(--font-display);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:none;background:var(--color-success-bd);color:#fff;padding:7px 14px;border-radius:var(--r-sm);cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:var(--shadow-sm)}
+.btn-export:hover{background:var(--_teal-dark);transform:translateY(-1px)}
+.wk-meta{font-size:11px;color:var(--color-text-secondary);font-family:var(--font-body)}
+.wk-meta strong{color:var(--color-text-primary);font-weight:700}
+
 @media(max-width:700px){.charts-row{grid-template-columns:1fr}header{flex-direction:column;gap:8px;text-align:center}header .meta{text-align:center}main{padding:12px}}
 </style>
 </head>
@@ -342,16 +358,47 @@ td.emp-op{color:var(--color-brand-primary);font-weight:700}
 
 <!-- WEEKLY -->
 <div id="tab-weekly" class="tab-content">
-  <p class="note" style="margin-top:8px;margin-bottom:10px">Hours are NET of 45 min/day break. Weeks run Wed–Tue. Values in decimal hours (e.g. 8.75 = 8h 45m). Miss YTD = total missing clock-outs for this employee year-to-date.</p>
+  <p class="note" style="margin-top:8px;margin-bottom:10px">Hours are NET of 45 min/day break. Weeks run Wed–Tue. Values in decimal hours (e.g. 8.75 = 8h 45m). Miss YTD = total missing clock-outs YTD.</p>
   <div class="controls">
     <input type="text" id="wk-search" placeholder="Search name or ID..." oninput="filterWk()">
-    <select id="wk-emp" onchange="filterWk()"><option value="">All Employers</option><option>Olympic Paints</option><option>Primeserve</option></select>
+    <select id="wk-emp" onchange="filterWk()" title="Employer">
+      <option value="">All Employers</option>
+      <option value="Olympic Paints">OP — Olympic Paints</option>
+      <option value="Primeserve">PS — Primeserve</option>
+    </select>
+    <select id="wk-miss" onchange="filterWk()" title="Missed clock-outs">
+      <option value="">Any miss status</option>
+      <option value="missing">Has missed clock-outs</option>
+      <option value="clean">No missed clock-outs</option>
+    </select>
+    <select id="wk-min-hrs" onchange="filterWk()" title="Minimum total hours (visible weeks)">
+      <option value="0">Any hours</option>
+      <option value="1">≥ 1h</option>
+      <option value="20">≥ 20h</option>
+      <option value="40">≥ 40h</option>
+      <option value="80">≥ 80h</option>
+      <option value="160">≥ 160h</option>
+    </select>
+    <button onclick="exportWk()" class="btn-export" title="Download visible rows + weeks as Excel">⬇ Export to Excel</button>
   </div>
+
+  <div class="wk-filter-bar">
+    <span class="wk-filter-label">Weeks</span>
+    <button class="wk-preset" onclick="setWkPreset(2)">Last 2</button>
+    <button class="wk-preset" onclick="setWkPreset(4)">Last 4</button>
+    <button class="wk-preset" onclick="setWkPreset(0)">All</button>
+    <button class="wk-preset" onclick="setWkPreset(-1)">None</button>
+    <span class="wk-divider"></span>
+    <span id="wk-week-chips"></span>
+  </div>
+
+  <div class="wk-meta" id="wk-meta" style="margin-bottom:8px"></div>
+
   <div class="legend">
     <div class="chip"><div class="chip-dot" style="background:rgba(107,158,208,.18);border:1px solid #6B9ED0"></div> Day hours (Wed–Tue)</div>
     <div class="chip"><div class="chip-dot" style="background:rgba(45,107,168,.30);border:1px solid #2D6BA8"></div> Week total</div>
     <div class="chip"><div class="chip-dot" style="background:#1A3D6E;border:1px solid #F5C400"></div> Grand Total</div>
-    <div class="chip"><div class="chip-dot" style="background:#C8EDE7;border:1px solid #2D8C7A"></div> Primeserve</div>
+    <div class="chip"><div class="chip-dot" style="background:#C8EDE7;border:1px solid #2D8C7A"></div> Primeserve (PS)</div>
     <div class="chip"><div class="chip-dot" style="background:#FDF0A0;border:1px solid #D4A800"></div> Has missed clock-outs</div>
   </div>
   <div id="wk-table-wrap" class="table-wrap"><table id="wk-table"><thead id="wk-thead"></thead><tbody id="wk-body"></tbody></table></div>
@@ -658,17 +705,44 @@ function filterDept(){
 
 // ── WEEKLY ────────────────────────────────────────────────────────────
 const WK_DAYS=['Wed','Thu','Fri','Sat','Sun','Mon','Tue'];
+/* Indices into D.wk_weeks of currently visible weeks. Default: last 2. */
+let wkSelIdx=[];
+function initWkWeeks(){
+  const n=D.wk_weeks.length;
+  wkSelIdx=n>=2?[n-2,n-1]:Array.from({length:n},(_,i)=>i);
+  renderWkChips();
+}
+function renderWkChips(){
+  const host=document.getElementById('wk-week-chips');if(!host)return;
+  host.innerHTML=D.wk_weeks.map((w,i)=>{
+    const on=wkSelIdx.includes(i);
+    return `<button class="wk-chip${on?' active':''}" onclick="toggleWkChip(${i})" title="${w.start}">${w.label}</button>`;
+  }).join('');
+}
+function toggleWkChip(i){
+  const at=wkSelIdx.indexOf(i);
+  if(at>=0)wkSelIdx.splice(at,1);else wkSelIdx.push(i);
+  wkSelIdx.sort((a,b)=>a-b);
+  renderWkChips();filterWk();
+}
+function setWkPreset(n){
+  const total=D.wk_weeks.length;
+  if(n===0)wkSelIdx=Array.from({length:total},(_,i)=>i);
+  else if(n===-1)wkSelIdx=[];
+  else wkSelIdx=Array.from({length:Math.min(n,total)},(_,k)=>total-Math.min(n,total)+k);
+  renderWkChips();filterWk();
+}
 function buildWkHeader(){
-  const weeks=D.wk_weeks;
   const thead=document.getElementById('wk-thead');
+  const sel=wkSelIdx.map(i=>D.wk_weeks[i]);
   let r1='<tr><th rowspan="2">Employer</th><th rowspan="2">ID</th><th rowspan="2">Name</th>';
-  weeks.forEach(w=>{
+  sel.forEach(w=>{
     r1+=`<th colspan="8" style="background:#1A3D6E;color:#fff;text-align:center;white-space:nowrap;border-bottom:2px solid #F5C400">${w.label}</th>`;
   });
   r1+='<th rowspan="2" style="background:#0D2040;color:#fff;min-width:80px;border-bottom:2px solid #F5C400">Grand Total</th>';
   r1+='<th rowspan="2" style="background:#A88000;color:#fff;min-width:70px;border-bottom:2px solid #F5C400">Miss YTD</th></tr>';
   let r2='<tr>';
-  weeks.forEach(()=>{
+  sel.forEach(()=>{
     WK_DAYS.forEach(d=>{
       r2+=`<th style="background:#2D6BA8;color:#fff;font-size:10px;min-width:38px">${d}</th>`;
     });
@@ -677,36 +751,103 @@ function buildWkHeader(){
   r2+='</tr>';
   thead.innerHTML=r1+r2;
 }
+function rowVisibleTotal(r){
+  return wkSelIdx.reduce((s,i)=>s+(r.weeks[i]?(r.weeks[i].total||0):0),0);
+}
 function renderWk(rows){
   const b=document.getElementById('wk-body');b.innerHTML='';
+  if(wkSelIdx.length===0){
+    b.innerHTML=`<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--color-text-secondary);font-style:italic">No weeks selected. Click a week chip or a preset above to show data.</td></tr>`;
+    return;
+  }
   rows.forEach(r=>{
     const ps=r.employer==='Primeserve';
     const hasMiss=r.missYTD>0;
+    const visTotal=rowVisibleTotal(r);
     let cells='';
-    r.weeks.forEach(w=>{
+    wkSelIdx.forEach(wi=>{
+      const w=r.weeks[wi]||{days:{},total:0};
       WK_DAYS.forEach(d=>{
-        const v=w.days[d]||0;
+        const v=(w.days&&w.days[d])||0;
         cells+=`<td class="center" style="background:rgba(107,158,208,.12);color:var(--color-text-primary);font-size:11px">${v>0?v.toFixed(1):''}</td>`;
       });
       cells+=`<td class="center" style="background:rgba(45,107,168,.25);color:var(--color-text-primary);font-weight:700">${w.total>0?w.total.toFixed(1):''}</td>`;
     });
     b.innerHTML+=`<tr class="${ps?'primeserve':''}">
-      <td class="${ps?'emp-ps':'emp-op'}">${r.employer}</td>
+      <td class="${ps?'emp-ps':'emp-op'}" style="font-weight:800">${ps?'PS':'OP'}</td>
       <td style="font-size:11px;color:var(--color-text-secondary)">${r.id}</td>
       <td><strong>${r.name}</strong></td>
       ${cells}
-      <td class="center" style="background:#1A3D6E;color:#F5C400;font-weight:800">${r.gt>0?r.gt.toFixed(1):''}</td>
+      <td class="center" style="background:#1A3D6E;color:#F5C400;font-weight:800">${visTotal>0?visTotal.toFixed(1):''}</td>
       <td class="center" style="background:${hasMiss?'rgba(245,196,0,.18)':'rgba(45,140,122,.15)'};font-weight:800;color:${hasMiss?'var(--color-warning-fg)':'var(--color-success-fg)'}">${r.missYTD||0}</td>
     </tr>`;
   });
 }
-function filterWk(){
+function getFilteredWkRows(){
   const s=(document.getElementById('wk-search').value||'').toLowerCase();
   const e=document.getElementById('wk-emp').value;
-  let rows=D.wk_detail_table;
+  const m=document.getElementById('wk-miss').value;
+  const minH=parseFloat(document.getElementById('wk-min-hrs').value)||0;
+  let rows=D.wk_detail_table.slice();
   if(e)rows=rows.filter(r=>r.employer===e);
   if(s)rows=rows.filter(r=>r.name.toLowerCase().includes(s)||r.id.toLowerCase().includes(s));
+  if(m==='missing')rows=rows.filter(r=>(r.missYTD||0)>0);
+  else if(m==='clean')rows=rows.filter(r=>(r.missYTD||0)===0);
+  if(minH>0)rows=rows.filter(r=>rowVisibleTotal(r)>=minH);
+  return rows;
+}
+function filterWk(){
+  buildWkHeader();
+  const rows=getFilteredWkRows();
   renderWk(rows);
+  const meta=document.getElementById('wk-meta');
+  if(meta){
+    const opN=rows.filter(r=>r.employer==='Olympic Paints').length;
+    const psN=rows.filter(r=>r.employer==='Primeserve').length;
+    const sumH=rows.reduce((s,r)=>s+rowVisibleTotal(r),0);
+    const wkLbl=wkSelIdx.length?wkSelIdx.map(i=>D.wk_weeks[i].label).join(', '):'(none)';
+    meta.innerHTML=`Showing <strong>${rows.length}</strong> employees (OP <strong>${opN}</strong> / PS <strong>${psN}</strong>) &middot; <strong>${wkSelIdx.length}</strong> week${wkSelIdx.length===1?'':'s'}: ${wkLbl} &middot; visible-total <strong>${sumH.toFixed(1)}h</strong>`;
+  }
+}
+function exportWk(){
+  const rows=getFilteredWkRows();
+  const sel=wkSelIdx.map(i=>D.wk_weeks[i]);
+  const aoa=[];
+  // Two header rows
+  const h1=['Employer','Employee ID','Name'];
+  const h2=['','',''];
+  sel.forEach(w=>{WK_DAYS.forEach(d=>{h1.push(w.label);h2.push(d);});h1.push(w.label);h2.push('Total');});
+  h1.push('','');h2.push('Grand Total','Miss YTD');
+  aoa.push(h1,h2);
+  rows.forEach(r=>{
+    const ps=r.employer==='Primeserve';
+    const out=[ps?'PS':'OP',r.id,r.name];
+    let gt=0;
+    wkSelIdx.forEach(wi=>{
+      const w=r.weeks[wi]||{days:{},total:0};
+      WK_DAYS.forEach(d=>out.push(((w.days&&w.days[d])||0)));
+      out.push(w.total||0);gt+=(w.total||0);
+    });
+    out.push(gt,r.missYTD||0);
+    aoa.push(out);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  // Auto-fit-ish column widths
+  ws['!cols']=[{wch:5},{wch:11},{wch:24}].concat(
+    sel.flatMap(()=>WK_DAYS.map(()=>({wch:6})).concat([{wch:8}]))
+  ).concat([{wch:11},{wch:9}]);
+  // Merge week label cells across the 8 day columns
+  ws['!merges']=ws['!merges']||[];
+  let c=3;
+  sel.forEach(()=>{
+    ws['!merges'].push({s:{r:0,c},e:{r:0,c:c+7}});
+    c+=8;
+  });
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Weekly Hours');
+  const ts=new Date().toISOString().slice(0,10);
+  const tag=document.getElementById('wk-emp').value?'_'+document.getElementById('wk-emp').value.replace(' ','_'):'';
+  XLSX.writeFile(wb,`Olympic_Paints_Weekly_Hours${tag}_${ts}.xlsx`);
 }
 
 // ── MISSING ───────────────────────────────────────────────────────────
@@ -753,8 +894,8 @@ function mkDoughnut(id,labels,data,colors){
 
 document.addEventListener('DOMContentLoaded',()=>{
   initOverview();
-  buildWkHeader();
-  renderWk(D.wk_detail_table);
+  initWkWeeks();
+  filterWk();
 });
 </script>
 </body>
