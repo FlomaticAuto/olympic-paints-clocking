@@ -270,7 +270,7 @@ td.emp-op{color:var(--color-brand-primary);font-weight:700}
     </div>
   </div>
   <div class="meta">
-    Generated: 09 May 2026<br>
+    Generated: 10 May 2026<br>
     102 employees &middot; 45 min break deducted daily<br>
     <span class="badge brand">Olympic Paints: 74</span>
     <span class="badge">Primeserve: 28</span>
@@ -828,7 +828,7 @@ async function exportWk(){
   const WHITE='FFFFFFFF',ROW_LT='FFF7F6F3',BORDER='FFD0D0CC',MUTED='FF666666';
 
   const wb=new ExcelJS.Workbook();
-  wb.creator='Olympic Paints — HAVEN HR';
+  wb.creator='Olympic Paints — HR';
   wb.lastModifiedBy='Clocking Dashboard';
   wb.created=new Date();
   const ws=wb.addWorksheet('Weekly Hours',{
@@ -844,7 +844,7 @@ async function exportWk(){
   /* ── Row 1: Title ───────────────────────────────────────────── */
   ws.mergeCells(1,1,1,totalCols);
   const t=ws.getCell(1,1);
-  t.value='OLYMPIC PAINTS — HAVEN HR — WEEKLY HOURS REPORT';
+  t.value='OLYMPIC PAINTS — WEEKLY HOURS REPORT';
   t.font={name:'Calibri',size:18,bold:true,color:{argb:WHITE}};
   t.fill={type:'pattern',pattern:'solid',fgColor:{argb:NAVY}};
   t.alignment={horizontal:'center',vertical:'middle'};
@@ -1043,7 +1043,7 @@ async function exportWk(){
     margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.3,footer:0.3},
     printTitlesRow:'1:5'
   };
-  ws.headerFooter.oddFooter='&LOlympic Paints — HAVEN HR&CWeekly Hours Report&RPage &P of &N';
+  ws.headerFooter.oddFooter='&LOlympic Paints&CWeekly Hours Report&RPage &P of &N';
 
   /* ── Write & download ───────────────────────────────────────── */
   const buf=await wb.xlsx.writeBuffer();
